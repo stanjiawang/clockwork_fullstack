@@ -2,7 +2,11 @@ import { onBeforeUnmount, shallowRef } from 'vue'
 import type { ClusterFrame } from '@clockwork/contracts'
 import { computeRetryDelay } from './resilience'
 
-const STREAM_URL = import.meta.env.VITE_BFF_STREAM_URL ?? 'ws://localhost:8000/api/stream'
+const DEFAULT_STREAM_URL =
+  typeof window !== 'undefined'
+    ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/stream`
+    : 'ws://localhost:8000/api/stream'
+const STREAM_URL = import.meta.env.VITE_BFF_STREAM_URL ?? DEFAULT_STREAM_URL
 const STALE_STREAM_TIMEOUT_MS = 3000
 const MAX_CONSECUTIVE_FAILURES = 5
 const CIRCUIT_BREAKER_COOLDOWN_MS = 15000

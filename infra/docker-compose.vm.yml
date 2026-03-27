@@ -1,0 +1,67 @@
+services:
+  simulator:
+    image: ${SIMULATOR_IMAGE}
+    restart: unless-stopped
+    environment:
+      SIMULATOR_SEED: "${SIMULATOR_SEED:-42}"
+      SIMULATOR_BIND_ADDRESS: "0.0.0.0:8080"
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  bff:
+    image: ${BFF_IMAGE}
+    restart: unless-stopped
+    environment:
+      SIMULATOR_HTTP_URL: "http://simulator:8080"
+      SIMULATOR_WS_URL: "ws://simulator:8080/stream"
+    expose:
+      - "8000"
+    depends_on:
+      simulator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    image: ${WEB_IMAGE}
+    restart: unless-stopped
+    expose:
+      - "8080"
+    depends_on:
+      bff:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  caddy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+      bff:
+        condition: service_healthy
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

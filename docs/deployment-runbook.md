@@ -22,6 +22,15 @@ If the goal is a public demo with minimal cost:
 
 GitHub Pages is a good fit for the frontend because it is static. It does not run the BFF or simulator.
 
+## Simplest Full-Stack Hosting Path
+
+If you want the least operational complexity, use one VM for all three runtime layers and put Caddy in front:
+
+- [docker-compose.vm.yml](/Users/stan/Work/clockwork_fullstack/infra/docker-compose.vm.yml)
+- [Caddyfile](/Users/stan/Work/clockwork_fullstack/infra/Caddyfile)
+
+That path is documented in [oracle-vm-runbook.md](/Users/stan/Work/clockwork_fullstack/docs/oracle-vm-runbook.md).
+
 ## Promotion flow
 
 - Push to `main` or `master`: automatic deploy to `staging` using the `latest` image tag

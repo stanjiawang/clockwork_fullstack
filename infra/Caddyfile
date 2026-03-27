@@ -1,0 +1,18 @@
+{$APP_DOMAIN} {
+  encode gzip zstd
+
+  @health path /healthz
+  respond @health 200
+
+  handle_path /api/* {
+    reverse_proxy bff:8000
+  }
+
+  handle /health {
+    reverse_proxy bff:8000
+  }
+
+  handle / {
+    reverse_proxy web:8080
+  }
+}

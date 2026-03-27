@@ -332,6 +332,22 @@ See [deployment-runbook.md](/Users/stan/Work/clockwork_fullstack/docs/deployment
 
 Important: GitHub Pages only hosts the frontend. The BFF and simulator still need their own runtime host.
 
+### Simplest Free Full-Stack Hosting
+
+If you want the easiest fully free full-stack deployment path, use one Oracle Free VM with:
+
+- [docker-compose.vm.yml](/Users/stan/Work/clockwork_fullstack/infra/docker-compose.vm.yml)
+- [Caddyfile](/Users/stan/Work/clockwork_fullstack/infra/Caddyfile)
+
+This gives you:
+
+- one public domain
+- HTTPS via Caddy
+- same-origin frontend + API
+- no extra CORS complexity for normal use
+
+See [oracle-vm-runbook.md](/Users/stan/Work/clockwork_fullstack/docs/oracle-vm-runbook.md).
+
 ## Interview Notes
 
 If you need to present this in an interview, focus on these points:

@@ -11,7 +11,9 @@ import type {
 } from '@clockwork/contracts'
 import { computeRetryDelay, createTimeoutError, isRetryableStatus } from './resilience'
 
-const BFF_HTTP_URL = import.meta.env.VITE_BFF_HTTP_URL ?? 'http://localhost:8000'
+const DEFAULT_HTTP_URL =
+  typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
+const BFF_HTTP_URL = import.meta.env.VITE_BFF_HTTP_URL ?? DEFAULT_HTTP_URL
 const HTTP_TIMEOUT_MS = 4000
 
 async function fetchJson<T>(path: string): Promise<T> {
