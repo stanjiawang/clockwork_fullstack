@@ -44,7 +44,14 @@ The bootstrap script installs:
 - [infra/docker-compose.vm.yml](/Users/stan/Work/clockwork_fullstack/infra/docker-compose.vm.yml)
 - [infra/Caddyfile](/Users/stan/Work/clockwork_fullstack/infra/Caddyfile)
 - [infra/deploy-vm.sh](/Users/stan/Work/clockwork_fullstack/infra/deploy-vm.sh)
+- [infra/push-vm-bundle.sh](/Users/stan/Work/clockwork_fullstack/infra/push-vm-bundle.sh)
 - [infra/vm.env.example](/Users/stan/Work/clockwork_fullstack/infra/vm.env.example)
+
+From your local machine, you can copy the bundle with:
+
+```bash
+./infra/push-vm-bundle.sh <ssh-user> <host> <remote-dir> [ssh-port]
+```
 
 ## Required environment file
 
