@@ -10,11 +10,43 @@ The repository publishes three container images to GHCR:
 
 Deployment is handled by [`.github/workflows/deploy.yml`](/Users/stan/Work/clockwork_fullstack/.github/workflows/deploy.yml). The workflow targets a remote Docker host through GitHub Environments.
 
+The repository also supports a frontend-only free hosting path through [`.github/workflows/deploy-pages.yml`](/Users/stan/Work/clockwork_fullstack/.github/workflows/deploy-pages.yml).
+
+## Recommended Free Hosting Split
+
+If the goal is a public demo with minimal cost:
+
+- frontend: GitHub Pages
+- BFF: separate free or low-cost runtime host
+- simulator: same host as the BFF
+
+GitHub Pages is a good fit for the frontend because it is static. It does not run the BFF or simulator.
+
 ## Promotion flow
 
 - Push to `main` or `master`: automatic deploy to `staging` using the `latest` image tag
 - Push a `v*` tag: automatic deploy to `production` using that tag
 - Manual dispatch: deploy any chosen image tag to either environment
+
+## GitHub Pages Frontend Deployment
+
+[`.github/workflows/deploy-pages.yml`](/Users/stan/Work/clockwork_fullstack/.github/workflows/deploy-pages.yml) deploys the frontend to GitHub Pages on `main` / `master` pushes and on manual dispatch.
+
+### Required repository secrets
+
+- `PAGES_BFF_HTTP_URL`
+- `PAGES_BFF_STREAM_URL`
+
+These should point to the public BFF deployment, for example:
+
+- `PAGES_BFF_HTTP_URL=https://api.example.com`
+- `PAGES_BFF_STREAM_URL=wss://api.example.com/api/stream`
+
+### Notes
+
+- The Pages build uses a repository-relative base path
+- The workflow copies `index.html` to `404.html` so SPA refreshes work on GitHub Pages
+- This workflow is frontend-only and does not replace the full-stack deploy workflow
 
 ## Deployment model
 

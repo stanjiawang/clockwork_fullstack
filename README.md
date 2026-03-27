@@ -59,6 +59,7 @@ The narrative is simple: stable clock sync keeps the training fabric healthy; dr
 - Docker / Docker Compose
 - GitHub Actions CI
 - GHCR image publishing
+- GitHub Pages frontend deployment
 - remote Docker-host deployment workflow with smoke tests
 
 ## Current Repository Structure
@@ -317,6 +318,19 @@ All major test expectations are documented in [testing-strategy.md](/Users/stan/
 - runs post-deploy smoke tests against public URLs
 
 See [deployment-runbook.md](/Users/stan/Work/clockwork_fullstack/docs/deployment-runbook.md).
+
+### Free Frontend Hosting
+
+[deploy-pages.yml](/Users/stan/Work/clockwork_fullstack/.github/workflows/deploy-pages.yml):
+
+- deploys the frontend to GitHub Pages
+- builds with a repository-relative base path
+- expects:
+  - `PAGES_BFF_HTTP_URL`
+  - `PAGES_BFF_STREAM_URL`
+- is the easiest free public hosting option for the UI layer
+
+Important: GitHub Pages only hosts the frontend. The BFF and simulator still need their own runtime host.
 
 ## Interview Notes
 
