@@ -27,22 +27,24 @@ This avoids cross-origin issues and gives the frontend same-origin defaults.
 
 ## VM preparation
 
-Install:
+Fastest path:
+
+1. SSH into the VM
+2. Run [bootstrap-oracle-vm.sh](/Users/stan/Work/clockwork_fullstack/infra/bootstrap-oracle-vm.sh) as `root`
+3. Point your DNS record at the VM public IP
+
+The bootstrap script installs:
 
 - Docker Engine
 - Docker Compose plugin
-
-Open inbound ports:
-
-- `80`
-- `443`
-
-Point your DNS record at the VM public IP.
+- firewall rules for `22`, `80`, and `443`
 
 ## Files to copy to the VM
 
 - [infra/docker-compose.vm.yml](/Users/stan/Work/clockwork_fullstack/infra/docker-compose.vm.yml)
 - [infra/Caddyfile](/Users/stan/Work/clockwork_fullstack/infra/Caddyfile)
+- [infra/deploy-vm.sh](/Users/stan/Work/clockwork_fullstack/infra/deploy-vm.sh)
+- [infra/vm.env.example](/Users/stan/Work/clockwork_fullstack/infra/vm.env.example)
 
 ## Required environment file
 
@@ -56,13 +58,13 @@ SIMULATOR_IMAGE=ghcr.io/stanjiawang/clockwork-simulator:latest
 SIMULATOR_SEED=42
 ```
 
+Create it by copying [vm.env.example](/Users/stan/Work/clockwork_fullstack/infra/vm.env.example) to `infra/.env` and editing `APP_DOMAIN`.
+
 ## Start the stack
 
 ```bash
-docker login ghcr.io -u <github-user>
-docker compose --env-file .env -f docker-compose.vm.yml pull
-docker compose --env-file .env -f docker-compose.vm.yml up -d
-docker compose --env-file .env -f docker-compose.vm.yml ps
+cd infra
+./deploy-vm.sh
 ```
 
 ## Validation

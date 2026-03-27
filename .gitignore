@@ -9,4 +9,4 @@ __pycache__
 coverage
 htmlcov
 bin
-
+infra/.env
