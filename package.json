@@ -1,0 +1,15 @@
+{
+  "name": "clockwork-fullstack",
+  "private": true,
+  "packageManager": "pnpm@10.6.0",
+  "scripts": {
+    "dev:web": "pnpm --dir apps/web dev",
+    "build:web": "pnpm --dir apps/web build",
+    "test:web": "pnpm --dir apps/web test",
+    "lint:web": "pnpm --dir apps/web lint",
+    "test:bff": "python3 -m venv .venv && .venv/bin/pip install -r services/bff/requirements.txt && .venv/bin/python -m pytest services/bff/tests",
+    "test:simulator": "cd services/simulator && GOCACHE=/tmp/go-build go test ./...",
+    "test:integration": "python3 -m venv .venv && .venv/bin/pip install -r services/bff/requirements.txt && .venv/bin/python -m pytest tests/integration",
+    "test:all": "pnpm lint:web && pnpm test:web && pnpm build:web && pnpm test:bff && pnpm test:simulator && pnpm test:integration"
+  }
+}

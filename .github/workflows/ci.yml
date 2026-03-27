@@ -1,0 +1,182 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'codex/**'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PNPM_VERSION: 10.6.0
+  NODE_VERSION: '22'
+  PYTHON_VERSION: '3.12'
+  GO_VERSION: '1.22'
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint frontend
+        run: pnpm lint:web
+
+      - name: Test frontend
+        run: pnpm test:web
+
+      - name: Build frontend
+        run: pnpm build:web
+
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          if-no-files-found: error
+
+  container-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: web
+            context: .
+            file: apps/web/Dockerfile
+          - name: bff
+            context: .
+            file: services/bff/Dockerfile
+          - name: simulator
+            context: .
+            file: services/simulator/Dockerfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.name }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: false
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  bff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: services/bff/requirements.txt
+
+      - name: Install BFF dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r services/bff/requirements.txt
+
+      - name: Validate BFF imports
+        run: .venv/bin/python -m compileall services/bff/app services/bff/tests
+
+      - name: Test BFF
+        run: .venv/bin/python -m pytest services/bff/tests
+
+  simulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: services/simulator/go.sum
+
+      - name: Verify Go formatting
+        working-directory: services/simulator
+        run: |
+          test -z "$(gofmt -l .)"
+
+      - name: Test simulator
+        working-directory: services/simulator
+        run: GOCACHE=/tmp/go-build go test ./...
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - frontend
+      - container-images
+      - bff
+      - simulator
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: services/bff/requirements.txt
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: services/simulator/go.sum
+
+      - name: Install integration dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r services/bff/requirements.txt
+
+      - name: Run integration tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: .venv/bin/python -m pytest tests/integration

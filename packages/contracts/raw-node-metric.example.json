@@ -1,0 +1,9 @@
+{
+  "node_id": "gpu-03-07",
+  "host_id": "host-03",
+  "clock_offset_ns": 112.4,
+  "p2p_latency_us": 2.1,
+  "packet_loss_pct": 0.02,
+  "timestamp_ms": 1710000000000
+}
+

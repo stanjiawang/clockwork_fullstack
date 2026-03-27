@@ -1,0 +1,27 @@
+{
+  "timestamp_ms": 1710000000000,
+  "cluster": {
+    "health_score": 94.5,
+    "straggler_count": 2,
+    "mean_offset_ns": 141.2,
+    "p95_latency_us": 3.4,
+    "sync_stability_index": 0.93,
+    "is_stale": false,
+    "last_frame_age_ms": 90
+  },
+  "changed_nodes": [
+    {
+      "node_id": "gpu-03-07",
+      "clock_offset_ns": 112.4,
+      "p2p_latency_us": 2.1,
+      "packet_loss_pct": 0.02,
+      "severity": "healthy",
+      "is_straggler": false
+    }
+  ],
+  "straggler_ids": [
+    "gpu-12-05",
+    "gpu-12-06"
+  ]
+}
+

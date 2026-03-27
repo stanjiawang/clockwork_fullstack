@@ -1,0 +1,54 @@
+services:
+  simulator:
+    build:
+      context: ..
+      dockerfile: services/simulator/Dockerfile
+    image: ${SIMULATOR_IMAGE:-ghcr.io/stan/clockwork-simulator:local}
+    environment:
+      SIMULATOR_SEED: "${SIMULATOR_SEED:-42}"
+      SIMULATOR_BIND_ADDRESS: "0.0.0.0:8080"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  bff:
+    build:
+      context: ..
+      dockerfile: services/bff/Dockerfile
+    image: ${BFF_IMAGE:-ghcr.io/stan/clockwork-bff:local}
+    environment:
+      SIMULATOR_HTTP_URL: "http://simulator:8080"
+      SIMULATOR_WS_URL: "ws://simulator:8080/stream"
+    ports:
+      - "8000:8000"
+    depends_on:
+      simulator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_BFF_HTTP_URL: "${VITE_BFF_HTTP_URL:-http://localhost:8000}"
+        VITE_BFF_STREAM_URL: "${VITE_BFF_STREAM_URL:-ws://localhost:8000/api/stream}"
+    image: ${WEB_IMAGE:-ghcr.io/stan/clockwork-web:local}
+    ports:
+      - "4173:8080"
+    depends_on:
+      bff:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

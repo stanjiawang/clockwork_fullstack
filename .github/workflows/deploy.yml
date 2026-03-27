@@ -1,0 +1,172 @@
+name: Deploy Stack
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target GitHub Environment
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+      image_tag:
+        description: Image tag to deploy
+        required: true
+        default: latest
+        type: string
+      skip_smoke_tests:
+        description: Skip post-deploy smoke tests
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || (startsWith(github.ref, 'refs/tags/v') && 'production' || 'staging') }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (startsWith(github.ref, 'refs/tags/v') && 'production' || 'staging') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve deployment target
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENVIRONMENT="${{ inputs.environment }}"
+            IMAGE_TAG="${{ inputs.image_tag }}"
+            SKIP_SMOKE_TESTS="${{ inputs.skip_smoke_tests }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            ENVIRONMENT="production"
+            IMAGE_TAG="${{ github.ref_name }}"
+            SKIP_SMOKE_TESTS="false"
+          else
+            ENVIRONMENT="staging"
+            IMAGE_TAG="latest"
+            SKIP_SMOKE_TESTS="false"
+          fi
+          echo "environment=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          echo "skip_smoke_tests=$SKIP_SMOKE_TESTS" >> "$GITHUB_OUTPUT"
+
+      - name: Normalize image owner
+        id: owner
+        run: echo "value=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Render deployment environment file
+        run: |
+          cat <<EOF > infra/.deploy.env
+          WEB_IMAGE=ghcr.io/${{ steps.owner.outputs.value }}/clockwork-web:${{ steps.target.outputs.image_tag }}
+          BFF_IMAGE=ghcr.io/${{ steps.owner.outputs.value }}/clockwork-bff:${{ steps.target.outputs.image_tag }}
+          SIMULATOR_IMAGE=ghcr.io/${{ steps.owner.outputs.value }}/clockwork-simulator:${{ steps.target.outputs.image_tag }}
+          VITE_BFF_HTTP_URL=${{ secrets.PUBLIC_BFF_HTTP_URL }}
+          VITE_BFF_STREAM_URL=${{ secrets.PUBLIC_BFF_STREAM_URL }}
+          SIMULATOR_SEED=${{ secrets.SIMULATOR_SEED }}
+          EOF
+
+      - name: Copy deploy bundle to host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || '22' }}
+          source: "infra/docker-compose.prod.yml,infra/.deploy.env"
+          target: ${{ secrets.DEPLOY_PATH }}
+          strip_components: 1
+
+      - name: Deploy stack on host
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || '22' }}
+          script_stop: true
+          script: |
+            mkdir -p "${{ secrets.DEPLOY_PATH }}"
+            cd "${{ secrets.DEPLOY_PATH }}"
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+            docker compose --env-file .deploy.env -f docker-compose.prod.yml pull
+            docker compose --env-file .deploy.env -f docker-compose.prod.yml up -d
+            docker compose --env-file .deploy.env -f docker-compose.prod.yml ps
+
+      - name: Wait for public web health
+        if: ${{ steps.target.outputs.skip_smoke_tests != 'true' }}
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error "${{ secrets.PUBLIC_WEB_URL }}/healthz" >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Web health check failed" >&2
+          exit 1
+
+      - name: Wait for public BFF health
+        if: ${{ steps.target.outputs.skip_smoke_tests != 'true' }}
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error "${{ secrets.PUBLIC_BFF_HTTP_URL }}/health" >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "BFF health check failed" >&2
+          exit 1
+
+      - name: Validate public API responses
+        if: ${{ steps.target.outputs.skip_smoke_tests != 'true' }}
+        run: |
+          curl --fail --silent --show-error "${{ secrets.PUBLIC_BFF_HTTP_URL }}/api/health" >/tmp/deploy-api-health.json
+          curl --fail --silent --show-error "${{ secrets.PUBLIC_BFF_HTTP_URL }}/api/scenario" >/tmp/deploy-api-scenario.json
+          curl --fail --silent --show-error "${{ secrets.PUBLIC_BFF_HTTP_URL }}/api/topology" >/tmp/deploy-api-topology.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          health = json.loads(Path("/tmp/deploy-api-health.json").read_text())
+          scenario = json.loads(Path("/tmp/deploy-api-scenario.json").read_text())
+          topology = json.loads(Path("/tmp/deploy-api-topology.json").read_text())
+
+          assert health["status"] in {"ok", "degraded"}, health
+          assert "connected_clients" in health, health
+          assert "name" in scenario, scenario
+          assert len(topology["nodes"]) == 256, topology
+          assert len(topology["links"]) > 0, topology
+          PY
+
+      - name: Summarize deployment
+        run: |
+          {
+            echo "## Deployment complete"
+            echo ""
+            echo "- Trigger: \`${{ github.event_name }}\`"
+            echo "- Environment: \`${{ steps.target.outputs.environment }}\`"
+            echo "- Image tag: \`${{ steps.target.outputs.image_tag }}\`"
+            echo "- Web URL: ${{ secrets.PUBLIC_WEB_URL }}"
+            echo "- BFF URL: ${{ secrets.PUBLIC_BFF_HTTP_URL }}"
+            if [ "${{ steps.target.outputs.skip_smoke_tests }}" = "true" ]; then
+              echo "- Smoke tests: skipped"
+            else
+              echo "- Smoke tests: passed"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,21 @@
+{
+  "node_id": "gpu-12-05",
+  "host_id": "host-12",
+  "recent_metrics": [
+    {
+      "node_id": "gpu-12-05",
+      "host_id": "host-12",
+      "clock_offset_ns": 780.4,
+      "p2p_latency_us": 9.1,
+      "packet_loss_pct": 0.6,
+      "timestamp_ms": 1710000000000
+    }
+  ],
+  "anomaly": {
+    "offset_zscore": 3.4,
+    "latency_zscore": 2.8,
+    "is_straggler": true,
+    "recommendation": "Re-sync node clock and consider migrating the training shard if latency remains elevated."
+  }
+}
+
